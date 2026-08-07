@@ -1,4 +1,4 @@
-# Manada 纠正 — Mandarin Correction Engine
+# Manda 纠正 — Mandarin Correction Engine
 
 An AI-powered Mandarin correction tool for HSK 1–4 learners. Speak or type in English or Mandarin and get instant feedback on tones, grammar, vocabulary, and sentence structure — with a score out of 10.
 
