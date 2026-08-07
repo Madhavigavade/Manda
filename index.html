@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Manada - Mandarin Correction Engine</title>
+  <meta name="description" content="Free AI-powered Mandarin correction for HSK 1-4 learners. Tone, grammar, vocabulary scoring." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --ink: #1a1a2e; --red: #e63946; --jade: #2a9d8f; --gold: #e9c46a;
+      --cream: #faf9f6; --mist: #f0efeb; --slate: #6b7280; --border: #e5e4e0;
+      --font-ui: 'Inter', -apple-system, BlinkMacSystemFont, 'Noto Sans SC', sans-serif;
+      --font-hanzi: 'Noto Serif SC', 'Songti SC', serif;
+    }
+    body { font-family: var(--font-ui); background: var(--cream); color: var(--ink); -webkit-font-smoothing: antialiased; min-height: 100vh; }
+
+    .app { max-width: 620px; margin: 0 auto; padding: 0 16px 60px; }
+
+    /* Hero */
+    .hero { text-align: center; padding: 32px 0 20px; border-bottom: 1px solid var(--border); margin-bottom: 24px; }
+    .hero h1 { font-size: 28px; font-weight: 700; letter-spacing: -0.02em; }
+    .zh { font-family: var(--font-hanzi); font-weight: 400; color: var(--red); margin-left: 8px; font-size: 26px; }
+    .hero p { font-size: 14px; color: var(--slate); margin-top: 6px; }
+    .badge { display: inline-block; background: var(--mist); color: var(--slate); font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 4px; margin-left: 6px; letter-spacing: 0.04em; }
+    .badge-green { background: var(--jade); color: #fff; }
+    .badge-blue { background: #3b82f6; color: #fff; }
+
+    /* Sections */
+    .section { margin-bottom: 20px; }
+    .label { font-size: 11px; font-weight: 600; color: var(--slate); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; display: block; }
+    .toggle-row { display: flex; border-radius: 8px; overflow: hidden; border: 1px solid var(--border); }
+    .toggle-btn { flex: 1; padding: 10px 0; font-size: 13px; font-weight: 500; border: none; cursor: pointer; transition: all 0.15s; background: transparent; color: var(--slate); }
+    .toggle-btn.active { background: var(--ink); color: #fff; }
+
+    /* Input tabs */
+    .tab-row { display: flex; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
+    .tab-btn { padding: 8px 20px; font-size: 13px; color: var(--slate); background: transparent; border: none; border-bottom: 2px solid transparent; cursor: pointer; font-weight: 400; transition: all 0.15s; }
+    .tab-btn.active { color: var(--red); border-bottom-color: var(--red); font-weight: 600; }
+
+    textarea { width: 100%; min-height: 80px; padding: 14px; font-size: 15px; border: 1px solid var(--border); border-radius: 8px; background: #fff; color: var(--ink); resize: vertical; font-family: var(--font-ui); outline: none; line-height: 1.5; transition: border-color 0.15s; }
+    textarea:focus { border-color: var(--jade); }
+
+    /* Mic */
+    .mic-area { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 20px 0; }
+    .mic-btn { width: 80px; height: 80px; border-radius: 50%; border: 2px solid var(--border); background: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 32px; transition: all 0.2s; }
+    .mic-btn.recording { border-color: var(--red); background: #fef2f2; animation: pulse 1.2s infinite; }
+    @keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.05)} }
+    .mic-status { font-size: 13px; color: var(--slate); text-align: center; max-width: 300px; line-height: 1.4; }
+    .mic-status.err { color: var(--red); }
+
+    /* Submit */
+    .correct-btn { width: 100%; padding: 14px; border-radius: 8px; border: none; background: var(--ink); color: #fff; font-size: 15px; font-weight: 600; cursor: pointer; margin-top: 16px; transition: all 0.15s; letter-spacing: 0.01em; }
+    .correct-btn:disabled { background: var(--border); color: var(--slate); cursor: default; }
+    .correct-btn:not(:disabled):hover { opacity: 0.88; }
+
+    .error-msg { color: var(--red); font-size: 13px; margin-top: 10px; text-align: center; line-height: 1.4; }
+    .loading-box { text-align: center; color: var(--slate); font-size: 14px; padding: 24px 0; }
+    .loading-box .spin { font-size: 24px; margin-bottom: 8px; display: block; animation: spin 1.5s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Score card */
+    .score-card { display: flex; flex-direction: column; align-items: center; gap: 16px; padding: 20px 16px; background: var(--cream); border-radius: 10px; margin-bottom: 20px; border: 1px solid var(--border); }
+    .score-overall-wrap { display: flex; align-items: baseline; gap: 4px; }
+    .score-overall { font-size: 36px; font-weight: 700; }
+    .score-denom { font-size: 14px; color: var(--slate); }
+    .score-rings { display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; }
+    .ring-wrap { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+    .ring-label { font-size: 11px; color: var(--slate); font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em; }
+
+    /* Result card */
+    .result-card { background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-top: 24px; }
+    .result-label { font-size: 11px; color: var(--slate); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; font-weight: 600; }
+    .result-original { font-size: 15px; color: var(--slate); line-height: 1.5; }
+    .result-hanzi { font-family: var(--font-hanzi); font-size: 26px; font-weight: 600; color: var(--ink); line-height: 1.7; letter-spacing: 0.1em; }
+    .result-pinyin { font-size: 14px; color: var(--jade); margin-top: 6px; font-weight: 500; letter-spacing: 0.02em; line-height: 1.6; }
+    .speak-btn { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: 6px; border: 1px solid var(--border); background: transparent; color: var(--slate); font-size: 13px; cursor: pointer; margin-top: 10px; transition: background 0.15s; }
+    .speak-btn:hover { background: var(--mist); }
+    .divider { height: 1px; background: var(--border); margin: 16px 0; }
+
+    /* Breakdown table */
+    .breakdown-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
+    .breakdown-table th { text-align: left; color: var(--slate); font-weight: 500; padding: 8px 10px 8px 0; border-bottom: 1px solid var(--border); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; }
+    .breakdown-table td { padding: 10px 10px 10px 0; border-bottom: 1px solid var(--mist); vertical-align: top; line-height: 1.5; }
+    .breakdown-table tr:last-child td { border-bottom: none; }
+    .td-yours { color: var(--red); }
+    .td-correct { color: var(--jade); font-family: var(--font-hanzi); font-size: 14px; }
+    .td-reason { color: var(--slate); }
+    .success-note { font-size: 13px; color: var(--jade); margin-top: 12px; display: flex; align-items: flex-start; gap: 6px; line-height: 1.4; }
+    .alt-box { margin-top: 12px; padding: 10px 14px; background: var(--mist); border-radius: 6px; font-size: 13px; color: var(--slate); line-height: 1.6; }
+    .alt-hanzi { font-family: var(--font-hanzi); font-size: 15px; }
+
+    /* History */
+    .history-section { margin-top: 32px; }
+    .history-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 8px; border-bottom: 1px solid var(--mist); cursor: pointer; font-size: 14px; border-radius: 6px; transition: background 0.12s; }
+    .history-item:hover { background: var(--mist); }
+    .history-orig { color: var(--slate); max-width: 55%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .history-hanzi { font-family: var(--font-hanzi); font-size: 13px; color: var(--jade); }
+
+    .footer { text-align: center; padding: 32px 0 16px; font-size: 11px; color: var(--border); }
+
+    @media (max-width: 480px) {
+      .score-rings { gap: 12px; }
+      .result-hanzi { font-size: 22px; }
+      .breakdown-table { font-size: 12px; }
+      .score-overall { font-size: 30px; }
+    }
+  </style>
+</head>
+<body>
+<div class="app" id="root"></div>
+
+<script>
+// ========== CONFIG: OpenRouter API key ==========
+// This key is embedded in the code. Anyone who downloads this file will see it.
+// For public/shared versions, consider using a backend proxy instead.
+const OPENROUTER_API_KEY = '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';
+// ========================================================================
+
+// ── State ──────────────────────────────────────────────────────
+let state = {
+  mode:      'en',
+  tab:       'type',
+  textInput: '',
+  micText:   '',
+  recording: false,
+  micErr:    '',
+  loading:   false,
+  result:    null,
+  error:     '',
+  history:   JSON.parse(localStorage.getItem('manada_hist') || '[]'),
+};
+
+let recognition = null;
+
+// ── Model config (Qwen3 via OpenRouter — free, best for Mandarin) ──
+const OPENROUTER_ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
+const MODEL = 'qwen/qwen2.5-72b-instruct:free';
+
+// ── Helpers ────────────────────────────────────────────────────
+function esc(s) {
+  if (!s) return '';
+  const d = document.createElement('div');
+  d.textContent = String(s);
+  return d.innerHTML;
+}
+
+function getInput() {
+  return state.tab === 'type' ? state.textInput.trim() : state.micText.trim();
+}
+
+function setMode(m) { state.mode = m; render(); }
+function setTab(t)  { state.tab = t; render(); }
+
+function showHistory(i) {
+  state.result = state.history[i];
+  window.scrollTo({ top: document.querySelector('.result-card')?.offsetTop - 16 || 0, behavior: 'smooth' });
+  render();
+}
+
+// ── Mic ────────────────────────────────────────────────────────
+function toggleMic() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) {
+    state.micErr = 'Speech recognition requires Chrome or Edge on desktop/Android';
+    render(); return;
+  }
+  state.recording ? stopMic() : startMic();
+}
+
+function startMic() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  recognition = new SR();
+  recognition.lang = state.mode === 'en' ? 'en-US' : 'zh-CN';
+  recognition.interimResults = true;
+  recognition.continuous = false;
+
+  recognition.onresult = e => {
+    let t = '';
+    for (let i = 0; i < e.results.length; i++) t += e.results[i][0].transcript;
+    state.micText = t;
+    render();
+  };
+
+  recognition.onerror = e => {
+    const msgs = {
+      'not-allowed': 'Mic blocked - click the mic icon in the address bar to allow access',
+      'no-speech':   'No speech detected - try again',
+      'network':     'Network error during recognition',
+      'aborted':     'Cancelled',
+    };
+    state.micErr = msgs[e.error] || 'Mic error: ' + e.error;
+    state.recording = false;
+    render();
+  };
+
+  recognition.onend = () => { state.recording = false; render(); };
+
+  try {
+    recognition.start();
+    state.recording = true;
+    state.micErr = '';
+    state.micText = '';
+    render();
+  } catch(e) {
+    state.micErr = 'Could not start mic: ' + e.message;
+    render();
+  }
+}
+
+function stopMic() {
+  if (recognition) { try { recognition.stop(); } catch(e) {} recognition = null; }
+  state.recording = false;
+  render();
+}
+
+function speak(text) {
+  const utt = new SpeechSynthesisUtterance(text);
+  utt.lang = 'zh-CN';
+  utt.rate = 0.85;
+  window.speechSynthesis.cancel();
+  window.speechSynthesis.speak(utt);
+}
+
+// ── API call ───────────────────────────────────────────────────
+async function runCorrection() {
+  const input = getInput();
+  if (!input) return;
+
+  // Check if API key is configured
+  if (OPENROUTER_API_KEY.includes('YOUR-KEY')) {
+    state.error = 'ERROR: Replace OPENROUTER_API_KEY in the code with your key from openrouter.ai/keys';
+    render();
+    return;
+  }
+
+  state.loading = true;
+  state.error   = '';
+  state.result  = null;
+  render();
+
+  const systemPrompt = `You are Manada, a Mandarin correction engine for HSK 1-4 learners. You are powered by Qwen - Alibaba's leading Chinese language model.
+
+Input mode: ${state.mode === 'en'
+  ? 'English to Mandarin - translate the English input into correct, natural Mandarin Chinese'
+  : 'Mandarin correction - correct tones, grammar, measure words, word order, and characters'}
+
+Respond ONLY with a valid JSON object. No markdown, no backticks, no commentary - pure JSON only:
+{
+  "original": "the user's input exactly as given",
+  "corrected_hanzi": "correct Mandarin Hanzi with a space between each word/phrase boundary for readability",
+  "corrected_pinyin": "pinyin with tone diacritics (a with macron, a with acute, a with caron, a with grave), one space between each syllable group",
+  "is_correct": true or false,
+  "scores": {
+    "grammar": <integer 0-10>,
+    "tones": <integer 0-10>,
+    "vocabulary": <integer 0-10>,
+    "structure": <integer 0-10>
+  },
+  "breakdown": [
+    { "element": "what was checked", "yours": "what they had, or N/A for English mode", "correct": "correct Mandarin form", "reason": "concise explanation, max 12 words" }
+  ],
+  "what_you_got_right": "brief encouraging note, or empty string if nothing to add",
+  "natural_alt": "a more natural or common way to express this at HSK 1-4 level, or empty string"
+}
+
+Scoring rubric:
+- grammar (0-10): correctness of particles, measure words, aspect markers (le/zhe/guo), ba/bei sentences
+- tones (0-10): tone accuracy; for English input score the tonal difficulty of the translation
+- vocabulary (0-10): appropriate HSK 1-4 word choice; deduct for words above HSK 4
+- structure (0-10): word order (Subject-Time-Place-Verb-Object), sentence completeness
+
+Rules:
+- Keep strictly within HSK 1-4 vocabulary scope
+- Never suggest vocab above HSK 4 unless user explicitly asks
+- Be concise in all fields
+- Always show pinyin even if user did not use it
+- If sentence is fully correct, say so clearly and explain why it works`;
+
+  try {
+    const res = await fetch(OPENROUTER_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + OPENROUTER_API_KEY,
+        'HTTP-Referer': 'https://github.com',
+        'X-Title': 'Manada',
+      },
+      body: JSON.stringify({
+        model: MODEL,
+        max_tokens: 1200,
+        temperature: 0.2,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user',   content: input },
+        ],
+      }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      if (res.status === 429) throw new Error('Rate limit - try again in a moment or add credit to openrouter.ai');
+      if (res.status === 401) throw new Error('Invalid API key - check your OPENROUTER_API_KEY in the code');
+      throw new Error(err.error?.message || 'API error ' + res.status);
+    }
+
+    const data   = await res.json();
+    const raw    = data.choices?.[0]?.message?.content || '';
+    const clean  = raw.replace(/```json|```/g, '').replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+    const parsed = JSON.parse(clean);
+
+    state.result  = parsed;
+    state.history = [parsed, ...state.history].slice(0, 20);
+    localStorage.setItem('manada_hist', JSON.stringify(state.history));
+
+  } catch(err) {
+    state.error = err.message || 'Something went wrong - please try again';
+  } finally {
+    state.loading = false;
+    render();
+  }
+}
+
+// ── Render ─────────────────────────────────────────────────────
+function renderScoreRing(score, label, color) {
+  const R = 28, C = 2 * Math.PI * R;
+  const offset = C * (1 - Math.max(0, Math.min(10, score)) / 10);
+  return `<div class="ring-wrap">
+    <svg width="68" height="68" viewBox="0 0 68 68" aria-label="${label}: ${score}/10">
+      <circle cx="34" cy="34" r="${R}" fill="none" stroke="var(--mist)" stroke-width="5"/>
+      <circle cx="34" cy="34" r="${R}" fill="none" stroke="${color}" stroke-width="5"
+        stroke-linecap="round" stroke-dasharray="${C.toFixed(2)}" stroke-dashoffset="${offset.toFixed(2)}"
+        transform="rotate(-90 34 34)" style="transition:stroke-dashoffset 0.7s ease"/>
+      <text x="34" y="39" text-anchor="middle" font-size="15" font-weight="600" fill="var(--ink)" font-family="Inter, sans-serif">${score}</text>
+    </svg>
+    <div class="ring-label">${label}</div>
+  </div>`;
+}
+
+function renderResultCard(r) {
+  const sc = r.scores;
+  const overall = sc ? Math.round(((sc.grammar + sc.tones + sc.vocabulary + sc.structure) / 4) * 10) / 10 : null;
+  const gradeColor = overall === null ? 'var(--jade)' : overall >= 8 ? 'var(--jade)' : overall >= 5 ? '#d97706' : 'var(--red)';
+
+  const scoreBlock = sc ? `
+    <div class="score-card">
+      <div class="score-overall-wrap">
+        <span class="score-overall" style="color:${gradeColor}">${overall}</span>
+        <span class="score-denom">/10 overall</span>
+      </div>
+      <div class="score-rings">
+        ${renderScoreRing(sc.grammar,    'Grammar',   '#5b8def')}
+        ${renderScoreRing(sc.tones,      'Tones',     'var(--red)')}
+        ${renderScoreRing(sc.vocabulary, 'Vocab',     'var(--jade)')}
+        ${renderScoreRing(sc.structure,  'Structure', '#d97706')}
+      </div>
+    </div>` : '';
+
+  const rows = (r.breakdown || []).map(b => `
+    <tr>
+      <td>${esc(b.element)}</td>
+      <td class="td-yours">${esc(b.yours || '—')}</td>
+      <td class="td-correct">${esc(b.correct)}</td>
+      <td class="td-reason">${esc(b.reason)}</td>
+    </tr>`).join('');
+
+  return `<div class="result-card">
+    ${scoreBlock}
+    <div style="margin-bottom:16px">
+      <div class="result-label">What you said</div>
+      <div class="result-original">${esc(r.original)}</div>
+    </div>
+    <div class="divider"></div>
+    <div style="margin-bottom:${rows ? 0 : 4}px">
+      <div class="result-label">${r.is_correct ? 'Correct' : 'Corrected Mandarin'}</div>
+      <div class="result-hanzi">${esc(r.corrected_hanzi)}</div>
+      <div class="result-pinyin">${esc(r.corrected_pinyin)}</div>
+      <button class="speak-btn" onclick="speak(${JSON.stringify(r.corrected_hanzi)})">Play pronunciation</button>
+    </div>
+    ${rows ? `<div class="divider"></div>
+    <div>
+      <div class="result-label">Breakdown</div>
+      <table class="breakdown-table">
+        <thead><tr><th>Element</th><th>Yours</th><th>Correct</th><th>Why</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>` : ''}
+    ${r.what_you_got_right ? `<div class="success-note"><span>Check</span><span>${esc(r.what_you_got_right)}</span></div>` : ''}
+    ${r.natural_alt ? `<div class="alt-box"><strong>More natural:</strong> <span class="alt-hanzi">${esc(r.natural_alt)}</span></div>` : ''}
+  </div>`;
+}
+
+function render() {
+  const s    = state;
+  const inp  = getInput();
+  const canGo = !s.loading && inp && !OPENROUTER_API_KEY.includes('YOUR-KEY');
+
+  document.getElementById('root').innerHTML = `
+    <div class="hero">
+      <h1>Manada<span class="zh">纠正</span></h1>
+      <p>
+        Mandarin correction engine
+        <span class="badge">HSK 1-4</span>
+        <span class="badge badge-blue">Qwen</span>
+        <span class="badge badge-green">v0.1</span>
+      </p>
+    </div>
+
+    <!-- Mode -->
+    <div class="section">
+      <span class="label">Mode</span>
+      <div class="toggle-row">
+        <button class="toggle-btn ${s.mode === 'en' ? 'active' : ''}" onclick="setMode('en')">English to Mandarin</button>
+        <button class="toggle-btn ${s.mode === 'zh' ? 'active' : ''}" onclick="setMode('zh')">Correct my Mandarin</button>
+      </div>
+    </div>
+
+    <!-- Input -->
+    <div class="section">
+      <div class="tab-row">
+        <button class="tab-btn ${s.tab === 'type' ? 'active' : ''}" onclick="setTab('type')">Type</button>
+        <button class="tab-btn ${s.tab === 'mic'  ? 'active' : ''}" onclick="setTab('mic')">Speak</button>
+      </div>
+
+      ${s.tab === 'type' ? `
+        <textarea id="mainInput"
+          placeholder="${s.mode === 'en' ? 'Type what you want to say in English...' : 'Type your Mandarin sentence here...'}"
+          oninput="state.textInput=this.value"
+        >${esc(s.textInput)}</textarea>
+      ` : `
+        <div class="mic-area">
+          <button class="mic-btn ${s.recording ? 'recording' : ''}" onclick="toggleMic()">
+            ${s.recording ? 'Stop' : 'Record'}
+          </button>
+          <div class="mic-status ${s.micErr ? 'err' : ''}">
+            ${s.micErr
+              ? s.micErr
+              : s.recording
+                ? 'Listening...'
+                : s.micText
+                  ? 'Done - tap to re-record'
+                  : 'Tap to speak in ' + (s.mode === 'en' ? 'English' : 'Mandarin')
+            }
+          </div>
+        </div>
+        <textarea id="micInput"
+          placeholder="Spoken text appears here - or paste/type directly..."
+          oninput="state.micText=this.value"
+        >${esc(s.micText)}</textarea>
+      `}
+    </div>
+
+    <button class="correct-btn" onclick="runCorrection()" ${canGo ? '' : 'disabled'}>
+      ${s.loading ? 'Analyzing...' : OPENROUTER_API_KEY.includes('YOUR-KEY') ? 'Setup API key first' : 'Correct it'}
+    </button>
+
+    ${s.error ? `<div class="error-msg">${esc(s.error)}</div>` : ''}
+
+    ${s.loading ? `
+      <div class="loading-box">
+        <span class="spin">Loading...</span>
+        Checking tones, grammar, and word choice with Qwen...
+      </div>` : ''}
+
+    ${s.result ? renderResultCard(s.result) : ''}
+
+    ${s.history.length > 0 ? `
+      <div class="history-section">
+        <span class="label">Recent corrections</span>
+        ${s.history.slice(0, 5).map((h, i) => `
+          <div class="history-item" onclick="showHistory(${i})">
+            <span class="history-orig">${esc(h.original)}</span>
+            <span class="history-hanzi">${esc(h.corrected_hanzi)}</span>
+          </div>`).join('')}
+      </div>` : ''}
+
+    <div class="footer">Manada v0.1 - HSK 1-4 - Powered by Qwen (open-source)</div>
+  `;
+}
+
+render();
+</script>
+</body>
+</html>
